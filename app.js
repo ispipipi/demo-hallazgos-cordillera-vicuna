@@ -41,6 +41,7 @@ const state = {
   view: "dashboard",
   theme: localStorage.getItem(THEME_KEY) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   expandedId: null,
+  selectedId: null,
   filters: { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" },
   ai: { stage: "idle", fileName: "", suggestions: [], selected: [] },
 };
@@ -73,6 +74,35 @@ function statusFromProgress(progress) {
 
 function statusClass(status) {
   return status === "Cerrado" ? "status-closed" : status === "En proceso" ? "status-process" : "status-open";
+}
+
+function findingCategory(record) {
+  if (record.origen === "TRP" || record.origen === "DSR") return "Gobernanza y revisión independiente";
+  if (/drenaje|filtr|agua|playa|talud|muro|instrument|piez|cota|eros/i.test(`${record.nombre} ${record.descripcion}`)) return "Control operacional e integridad";
+  return "Gestión y control operacional";
+}
+
+function findingCriterion(record) {
+  if (record.severidad === "Crítica") return "Gestión de riesgos · condición crítica";
+  if (record.origen === "TRP" || record.origen === "DSR") return "Recomendación / observación de revisión independiente";
+  return "Control operacional · seguimiento de condición";
+}
+
+function findingImplication(record) {
+  if (record.severidad === "Crítica") return "Requiere priorización gerencial y verificación documentada antes del cierre.";
+  if (record.severidad === "Alta") return "Puede afectar el desempeño esperado si no se gestiona dentro del plazo acordado.";
+  if (record.severidad === "Media") return "Requiere seguimiento operativo y evidencia de tratamiento.";
+  return "Se recomienda mantener control y trazabilidad hasta completar la acción correspondiente.";
+}
+
+function findingVerification(record) {
+  if (record.status === "Cerrado") return "Cerrado en el registro base";
+  if (record.progreso > 0) return "Verificación de cierre pendiente";
+  return "Pendiente de evidencia de tratamiento";
+}
+
+function findingRecord(id) {
+  return state.records.find((record) => record.id === id);
 }
 
 function badge(value, className) {
@@ -301,15 +331,40 @@ function renderFilters() {
 
 function renderTable(records) {
   if (!records.length) return `<div class="empty-state"><div class="empty-icon">⌕</div><strong>No hay hallazgos que coincidan con los filtros seleccionados.</strong><small>Prueba limpiando uno o más filtros.</small></div>`;
-  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Hallazgo</th><th>Muro</th><th>Origen</th><th>Severidad</th><th>Estado</th><th>Avance</th><th>Fecha</th></tr></thead><tbody>${records.map((record) => {
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Hallazgo</th><th>Muro</th><th>Origen</th><th>Severidad</th><th>Estado</th><th>Avance</th><th>Fecha</th><th>Ficha</th></tr></thead><tbody>${records.map((record) => {
     const expanded = state.expandedId === record.id;
-    return `<tr class="data-row ${expanded ? "expanded" : ""}" data-expand="${escapeHtml(record.id)}"><td class="id-cell">${escapeHtml(record.id)}</td><td class="title-cell">${escapeHtml(record.nombre)}<small>${escapeHtml(record.responsable)}</small></td><td>${escapeHtml(record.muroLabel)}</td><td>${escapeHtml(record.origen)}</td><td>${badge(record.severidad, SEVERITY_CLASS[record.severidad])}</td><td>${badge(record.status, statusClass(record.status))}</td><td><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${record.progreso}%"></div></div><span class="id-cell">${record.progreso}%</span></div></td><td class="id-cell">${formatDate(record.fecha)}</td></tr>${expanded ? `<tr class="detail-row"><td colspan="8"><div class="detail-content"><div><div class="detail-label">Descripción</div><div class="detail-value">${escapeHtml(record.descripcion)}</div></div><div><div class="detail-label">Plan de acción</div><div class="detail-value">${record.planAccion ? "Definido" : "Pendiente"}</div></div><div><div class="detail-label">Muro / origen</div><div class="detail-value">${escapeHtml(record.muroLabel)} · ${escapeHtml(record.origen)}</div></div><div><div class="detail-label">Responsable</div><div class="detail-value">${escapeHtml(record.responsable)}</div></div></div></td></tr>` : ""}`;
+    return `<tr class="data-row ${expanded ? "expanded" : ""}" data-expand="${escapeHtml(record.id)}"><td class="id-cell">${escapeHtml(record.id)}</td><td class="title-cell">${escapeHtml(record.nombre)}<small>${escapeHtml(record.responsable)}</small></td><td>${escapeHtml(record.muroLabel)}</td><td>${escapeHtml(record.origen)}</td><td>${badge(record.severidad, SEVERITY_CLASS[record.severidad])}</td><td>${badge(record.status, statusClass(record.status))}</td><td><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${record.progreso}%"></div></div><span class="id-cell">${record.progreso}%</span></div></td><td class="id-cell">${formatDate(record.fecha)}</td><td><button class="button small sheet-trigger" data-action="open-finding" data-id="${escapeHtml(record.id)}">Ver ficha</button></td></tr>${expanded ? `<tr class="detail-row"><td colspan="9"><div class="detail-content"><div><div class="detail-label">Descripción</div><div class="detail-value">${escapeHtml(record.descripcion)}</div></div><div><div class="detail-label">Plan de acción</div><div class="detail-value">${record.planAccion ? "Definido" : "Pendiente"}</div></div><div><div class="detail-label">Muro / origen</div><div class="detail-value">${escapeHtml(record.muroLabel)} · ${escapeHtml(record.origen)}</div></div><div><div class="detail-label">Responsable</div><div class="detail-value">${escapeHtml(record.responsable)}</div></div></div></td></tr>` : ""}`;
   }).join("")}</tbody></table></div>`;
+}
+
+function renderFindingSheet() {
+  const record = findingRecord(state.selectedId);
+  if (!record) return "";
+  return `<div class="sheet-overlay" role="presentation"><article class="finding-sheet" role="dialog" aria-modal="true" aria-labelledby="finding-sheet-title">
+    <header class="sheet-header">
+      <div><div class="sheet-kicker">Ficha de gestión · registro ${escapeHtml(record.origen)}</div><div class="sheet-id">${escapeHtml(record.id)}</div></div>
+      <button class="icon-button sheet-close" data-action="close-finding" aria-label="Cerrar ficha">×</button>
+    </header>
+    <div class="sheet-title-block"><div class="sheet-title-badges">${badge(record.severidad, SEVERITY_CLASS[record.severidad])} ${badge(record.status, statusClass(record.status))}</div><h2 id="finding-sheet-title">${escapeHtml(record.nombre)}</h2><p>${escapeHtml(record.muroLabel)} · ${escapeHtml(record.fecha ? formatDate(record.fecha) : "Fecha no registrada")}</p></div>
+    <div class="sheet-body">
+      <div class="sheet-main">
+        <section class="sheet-section"><div class="sheet-section-head"><span class="sheet-section-number">01</span><div><h3>Descripción del hallazgo</h3><p>Condición observada y contexto del registro</p></div></div><div class="sheet-copy">${escapeHtml(record.descripcion)}</div></section>
+        <section class="sheet-section"><div class="sheet-section-head"><span class="sheet-section-number">02</span><div><h3>Clasificación y criterio</h3><p>Campos preparados para una matriz tipo Implementator / GISTM</p></div></div><div class="sheet-field-grid"><div class="sheet-field"><span>Área de gestión</span><strong>${escapeHtml(findingCategory(record))}</strong></div><div class="sheet-field"><span>Criterio relacionado</span><strong>${escapeHtml(findingCriterion(record))}</strong></div><div class="sheet-field"><span>Implicancia / riesgo</span><strong>${escapeHtml(findingImplication(record))}</strong></div><div class="sheet-field"><span>Nivel de prioridad</span><strong>${escapeHtml(record.severidad)}</strong></div></div></section>
+        <section class="sheet-section"><div class="sheet-section-head"><span class="sheet-section-number">03</span><div><h3>Acción, evidencia y cierre</h3><p>Estado actual de la gestión y condición de cierre</p></div></div><div class="sheet-field-grid"><div class="sheet-field"><span>Plan de acción</span><strong>${record.planAccion ? "Definido en el registro" : "Pendiente de definición"}</strong></div><div class="sheet-field"><span>Verificación</span><strong>${escapeHtml(findingVerification(record))}</strong></div><div class="sheet-field"><span>Evidencia adjunta</span><strong class="muted-strong">No adjunta en esta demo</strong></div><div class="sheet-field"><span>Fuente del registro</span><strong>${escapeHtml(record.origen)} · dataset de demostración</strong></div></div></section>
+      </div>
+      <aside class="sheet-aside">
+        <div class="sheet-aside-card"><div class="sheet-aside-label">Control del hallazgo</div><div class="sheet-control"><span>Responsable</span><strong>${escapeHtml(record.responsable)}</strong></div><div class="sheet-control"><span>Ubicación</span><strong>${escapeHtml(record.muroLabel)}</strong></div><div class="sheet-control"><span>Origen</span><strong>${escapeHtml(record.origen)}</strong></div><div class="sheet-control"><span>Fecha de detección</span><strong>${escapeHtml(formatDate(record.fecha))}</strong></div></div>
+        <div class="sheet-aside-card"><div class="sheet-aside-label">Avance de gestión</div><div class="sheet-progress-value">${record.progreso}%</div><div class="sheet-progress-track"><span style="width:${record.progreso}%"></span></div><p class="sheet-progress-note">${record.status === "Cerrado" ? "Registro marcado como cerrado." : "El avance debe respaldarse con evidencia verificable."}</p></div>
+        <div class="sheet-demo-note"><span>i</span><p>Ficha demostrativa. Los campos de criterio, evidencia y verificación quedan listos para conectarse a un expediente real.</p></div>
+      </aside>
+    </div>
+    <footer class="sheet-footer"><span class="helper">Última actualización: ${escapeHtml(formatDate(record.fecha))} · registro base</span><div class="button-row"><button class="button small" data-action="print-finding">Imprimir ficha</button><button class="button small primary" data-action="close-finding">Cerrar</button></div></footer>
+  </article></div>`;
 }
 
 function renderList() {
   const records = filteredRecords();
-  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">Filtra, expande el detalle y exporta el universo visible.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
+  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">Filtra, expande el detalle o abre la ficha estructurada del hallazgo.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
 }
 
 function renderNewForm() {
@@ -355,8 +410,9 @@ function renderFooter() {
 
 function render() {
   applyTheme();
+  document.body.classList.toggle("modal-open", Boolean(state.selectedId));
   const view = state.view === "dashboard" ? renderDashboard() : state.view === "list" ? renderList() : state.view === "new" ? renderNewForm() : renderAi();
-  $("#app").innerHTML = `${renderHeader()}<main class="main">${renderHero()}${view}</main>${renderFooter()}`;
+  $("#app").innerHTML = `${renderHeader()}<main class="main">${renderHero()}${view}</main>${renderFooter()}${renderFindingSheet()}`;
 }
 
 function readFormData(form) {
@@ -410,9 +466,15 @@ function processFile(file) {
 }
 
 function handleClick(event) {
+  if (event.target.matches(".sheet-overlay")) {
+    state.selectedId = null;
+    render();
+    return;
+  }
   const roleButton = event.target.closest("[data-role]");
   if (roleButton) {
     state.activeRole = roleButton.dataset.role;
+    state.selectedId = null;
     if (state.activeRole === "management" && ["new", "ai"].includes(state.view)) state.view = "dashboard";
     render();
     return;
@@ -420,6 +482,7 @@ function handleClick(event) {
   const viewButton = event.target.closest("[data-view]");
   if (viewButton) {
     state.view = viewButton.dataset.view;
+    state.selectedId = null;
     render();
     return;
   }
@@ -437,6 +500,22 @@ function handleClick(event) {
   }
   if (action === "export-csv") {
     exportCsv();
+    return;
+  }
+  if (action === "open-finding") {
+    const record = findingRecord(event.target.closest("[data-id]")?.dataset.id);
+    if (!record) return;
+    state.selectedId = record.id;
+    render();
+    return;
+  }
+  if (action === "close-finding") {
+    state.selectedId = null;
+    render();
+    return;
+  }
+  if (action === "print-finding") {
+    window.print();
     return;
   }
   if (action === "analyze") {
@@ -489,6 +568,13 @@ function handleClick(event) {
   const expandable = event.target.closest("[data-expand]");
   if (expandable) {
     state.expandedId = state.expandedId === expandable.dataset.expand ? null : expandable.dataset.expand;
+    render();
+  }
+}
+
+function handleKeydown(event) {
+  if (event.key === "Escape" && state.selectedId) {
+    state.selectedId = null;
     render();
   }
 }
@@ -580,4 +666,5 @@ document.addEventListener("submit", handleSubmit);
 document.addEventListener("dragover", handleDrag);
 document.addEventListener("dragleave", handleDrag);
 document.addEventListener("drop", handleDrag);
+document.addEventListener("keydown", handleKeydown);
 init();

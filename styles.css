@@ -214,6 +214,47 @@ h3 { margin-bottom: 0; font-size: 15px; }
 .detail-content { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 15px; padding: 14px; border-left: 3px solid var(--brand); border-radius: var(--radius-sm); background: var(--surface); }
 .detail-label { color: var(--muted); font: 10px "IBM Plex Mono", monospace; text-transform: uppercase; }
 .detail-value { margin-top: 4px; color: var(--text); font-size: 12px; }
+.sheet-trigger { white-space: nowrap; }
+
+.modal-open { overflow: hidden; }
+.sheet-overlay { position: fixed; inset: 0; z-index: 40; display: flex; justify-content: flex-end; background: rgba(10, 34, 34, .56); backdrop-filter: blur(5px); }
+.finding-sheet { width: min(980px, 100%); height: 100%; overflow: auto; background: var(--bg); box-shadow: -18px 0 60px rgba(0, 0, 0, .18); animation: sheet-in .22s ease-out; }
+.sheet-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 25px 30px 13px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.sheet-kicker, .sheet-id, .sheet-aside-label { color: var(--muted); font: 600 10px "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.sheet-kicker { color: var(--gold); }
+.sheet-id { margin-top: 7px; color: var(--brand); font-size: 13px; letter-spacing: .02em; }
+.sheet-close { flex: 0 0 auto; border-radius: 10px; font-size: 22px; line-height: 1; }
+.sheet-title-block { padding: 22px 30px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.sheet-title-badges { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.sheet-title-block h2 { max-width: 760px; margin-bottom: 7px; font: 600 clamp(24px, 3vw, 34px)/1.08 "IBM Plex Serif", serif; }
+.sheet-title-block p { margin-bottom: 0; color: var(--muted); font: 500 11px "IBM Plex Mono", monospace; }
+.sheet-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; padding: 24px 30px; }
+.sheet-main { display: grid; gap: 16px; min-width: 0; }
+.sheet-section { padding: 19px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.sheet-section-head { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 17px; }
+.sheet-section-number { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 auto; border-radius: 7px; background: var(--brand-soft); color: var(--brand); font: 600 10px "IBM Plex Mono", monospace; }
+.sheet-section h3 { margin-bottom: 2px; color: var(--text); font-size: 14px; }
+.sheet-section-head p { margin-bottom: 0; color: var(--muted); font-size: 11px; }
+.sheet-copy { color: var(--text); font-size: 13px; line-height: 1.7; white-space: pre-line; }
+.sheet-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.sheet-field { min-height: 76px; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-alt); }
+.sheet-field span, .sheet-control span { display: block; margin-bottom: 5px; color: var(--muted); font: 10px "IBM Plex Mono", monospace; text-transform: uppercase; }
+.sheet-field strong, .sheet-control strong { display: block; color: var(--text); font-size: 12px; line-height: 1.45; }
+.muted-strong { color: var(--muted) !important; font-weight: 500; }
+.sheet-aside { display: grid; align-content: start; gap: 12px; }
+.sheet-aside-card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.sheet-control { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.sheet-control:first-of-type { margin-top: 4px; }
+.sheet-control:last-child { padding-bottom: 0; border-bottom: 0; }
+.sheet-progress-value { margin: 12px 0 9px; color: var(--text); font: 600 29px "IBM Plex Mono", monospace; }
+.sheet-progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-soft); }
+.sheet-progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+.sheet-progress-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
+.sheet-demo-note { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid var(--gold); border-radius: var(--radius-md); background: var(--gold-soft); color: var(--text); }
+.sheet-demo-note span { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; border-radius: 50%; background: var(--gold); color: var(--surface); font: 600 11px "IBM Plex Mono", monospace; }
+.sheet-demo-note p { margin: 0; font-size: 11px; line-height: 1.45; }
+.sheet-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 30px 26px; }
+@keyframes sheet-in { from { transform: translateX(26px); opacity: .75; } to { transform: translateX(0); opacity: 1; } }
 .progress-mini { display: flex; align-items: center; gap: 8px; }
 .progress-track { width: 70px; height: 6px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; }
 .progress-fill { height: 100%; background: var(--brand); border-radius: inherit; }
@@ -288,6 +329,9 @@ h3 { margin-bottom: 0; font-size: 15px; }
   .panel.span-2 { grid-column: auto; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .detail-content { grid-template-columns: 1fr 1fr; }
+  .sheet-body { grid-template-columns: 1fr; }
+  .sheet-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheet-demo-note { grid-column: 1 / -1; }
 }
 
 @media (max-width: 700px) {
@@ -319,5 +363,20 @@ h3 { margin-bottom: 0; font-size: 15px; }
   .form-footer, .ia-actions { align-items: stretch; flex-direction: column; }
   .button-row, .button-row .button { width: 100%; }
   .detail-content { grid-template-columns: 1fr; }
+  .sheet-header, .sheet-title-block, .sheet-body, .sheet-footer { padding-left: 16px; padding-right: 16px; }
+  .sheet-field-grid, .sheet-aside { grid-template-columns: 1fr; }
+  .sheet-demo-note { grid-column: auto; }
+  .sheet-footer { align-items: stretch; flex-direction: column; }
   .toast-region { right: 16px; bottom: 16px; }
+}
+
+@media print {
+  body { background: #fff; }
+  body > *:not(#app) { display: none !important; }
+  #app > *:not(.sheet-overlay) { display: none !important; }
+  .sheet-overlay { position: static; display: block; background: #fff; }
+  .finding-sheet { width: 100%; height: auto; overflow: visible; box-shadow: none; animation: none; }
+  .sheet-close, .sheet-footer .button-row, .sheet-demo-note { display: none; }
+  .sheet-body { grid-template-columns: 1fr 220px; }
+  .sheet-header, .sheet-title-block, .sheet-section, .sheet-aside-card { box-shadow: none; }
 }
