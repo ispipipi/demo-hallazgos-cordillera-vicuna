@@ -40,7 +40,6 @@ const state = {
   activeRole: "eor",
   view: "dashboard",
   theme: localStorage.getItem(THEME_KEY) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
-  expandedId: null,
   selectedId: null,
   filters: { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" },
   ai: { stage: "idle", fileName: "", suggestions: [], selected: [] },
@@ -103,6 +102,12 @@ function findingVerification(record) {
 
 function findingRecord(id) {
   return state.records.find((record) => record.id === id);
+}
+
+function openFinding(id) {
+  if (!findingRecord(id)) return;
+  state.selectedId = id;
+  render();
 }
 
 function badge(value, className) {
@@ -332,8 +337,7 @@ function renderFilters() {
 function renderTable(records) {
   if (!records.length) return `<div class="empty-state"><div class="empty-icon">⌕</div><strong>No hay hallazgos que coincidan con los filtros seleccionados.</strong><small>Prueba limpiando uno o más filtros.</small></div>`;
   return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Hallazgo</th><th>Muro</th><th>Origen</th><th>Severidad</th><th>Estado</th><th>Avance</th><th>Fecha</th><th>Ficha</th></tr></thead><tbody>${records.map((record) => {
-    const expanded = state.expandedId === record.id;
-    return `<tr class="data-row ${expanded ? "expanded" : ""}" data-expand="${escapeHtml(record.id)}"><td class="id-cell">${escapeHtml(record.id)}</td><td class="title-cell">${escapeHtml(record.nombre)}<small>${escapeHtml(record.responsable)}</small></td><td>${escapeHtml(record.muroLabel)}</td><td>${escapeHtml(record.origen)}</td><td>${badge(record.severidad, SEVERITY_CLASS[record.severidad])}</td><td>${badge(record.status, statusClass(record.status))}</td><td><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${record.progreso}%"></div></div><span class="id-cell">${record.progreso}%</span></div></td><td class="id-cell">${formatDate(record.fecha)}</td><td><button class="button small sheet-trigger" data-action="open-finding" data-id="${escapeHtml(record.id)}">Ver ficha</button></td></tr>${expanded ? `<tr class="detail-row"><td colspan="9"><div class="detail-content"><div><div class="detail-label">Descripción</div><div class="detail-value">${escapeHtml(record.descripcion)}</div></div><div><div class="detail-label">Plan de acción</div><div class="detail-value">${record.planAccion ? "Definido" : "Pendiente"}</div></div><div><div class="detail-label">Muro / origen</div><div class="detail-value">${escapeHtml(record.muroLabel)} · ${escapeHtml(record.origen)}</div></div><div><div class="detail-label">Responsable</div><div class="detail-value">${escapeHtml(record.responsable)}</div></div></div></td></tr>` : ""}`;
+    return `<tr class="data-row" data-open-finding="${escapeHtml(record.id)}" tabindex="0" role="button" aria-label="Abrir ficha de ${escapeHtml(record.id)}"><td class="id-cell">${escapeHtml(record.id)}</td><td class="title-cell">${escapeHtml(record.nombre)}<small>${escapeHtml(record.responsable)}</small></td><td>${escapeHtml(record.muroLabel)}</td><td>${escapeHtml(record.origen)}</td><td>${badge(record.severidad, SEVERITY_CLASS[record.severidad])}</td><td>${badge(record.status, statusClass(record.status))}</td><td><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${record.progreso}%"></div></div><span class="id-cell">${record.progreso}%</span></div></td><td class="id-cell">${formatDate(record.fecha)}</td><td><button class="button small sheet-trigger" data-action="open-finding" data-id="${escapeHtml(record.id)}">Ver ficha</button></td></tr>`;
   }).join("")}</tbody></table></div>`;
 }
 
@@ -364,7 +368,7 @@ function renderFindingSheet() {
 
 function renderList() {
   const records = filteredRecords();
-  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">Filtra, expande el detalle o abre la ficha estructurada del hallazgo.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
+  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">Filtra y haz clic en cualquier fila para abrir la ficha estructurada.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
 }
 
 function renderNewForm() {
@@ -503,10 +507,7 @@ function handleClick(event) {
     return;
   }
   if (action === "open-finding") {
-    const record = findingRecord(event.target.closest("[data-id]")?.dataset.id);
-    if (!record) return;
-    state.selectedId = record.id;
-    render();
+    openFinding(event.target.closest("[data-id]")?.dataset.id);
     return;
   }
   if (action === "close-finding") {
@@ -559,16 +560,14 @@ function handleClick(event) {
     addRecords(imported);
     state.ai = { stage: "idle", fileName: "", suggestions: [], selected: [] };
     state.filters = { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
-    state.expandedId = null;
     state.view = "list";
     render();
     toast(`${imported.length} hallazgo${imported.length === 1 ? "" : "s"} importado${imported.length === 1 ? "" : "s"} al listado.`);
     return;
   }
-  const expandable = event.target.closest("[data-expand]");
-  if (expandable) {
-    state.expandedId = state.expandedId === expandable.dataset.expand ? null : expandable.dataset.expand;
-    render();
+  const findingRow = event.target.closest("[data-open-finding]");
+  if (findingRow) {
+    openFinding(findingRow.dataset.openFinding);
   }
 }
 
@@ -576,6 +575,12 @@ function handleKeydown(event) {
   if (event.key === "Escape" && state.selectedId) {
     state.selectedId = null;
     render();
+    return;
+  }
+  const findingRow = event.target.closest?.("[data-open-finding]");
+  if (findingRow && ["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    openFinding(findingRow.dataset.openFinding);
   }
 }
 
@@ -628,7 +633,6 @@ function handleSubmit(event) {
   const record = { id, ...data, muroLabel: WALLS.find(([code]) => code === data.muro)?.[1] || "General", status: statusFromProgress(data.progreso) };
   addRecords([record]);
   state.filters = { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
-  state.expandedId = null;
   state.view = "list";
   render();
   toast(`Hallazgo ${id} guardado correctamente.`);
