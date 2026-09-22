@@ -130,6 +130,8 @@ h3 { margin-bottom: 0; font-size: 15px; }
 .kpi-card, .panel { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
 .kpi-card { position: relative; padding: 19px; overflow: hidden; }
 .kpi-card::after { content: ""; position: absolute; width: 90px; height: 90px; border-radius: 50%; right: -24px; bottom: -34px; background: var(--brand-soft); opacity: .8; }
+.kpi-card-action { cursor: pointer; text-align: left; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.kpi-card-action:hover, .kpi-card-action:focus-visible { border-color: var(--brand); outline: 0; transform: translateY(-2px); box-shadow: 0 20px 38px rgba(15, 76, 76, 0.13); }
 .kpi-label { color: var(--muted); font-size: 12px; font-weight: 600; }
 .kpi-value { margin: 8px 0 5px; color: var(--text); font: 600 32px/1 "IBM Plex Mono", monospace; letter-spacing: -.06em; }
 .kpi-foot { color: var(--muted); font-size: 11px; }
@@ -188,7 +190,8 @@ h3 { margin-bottom: 0; font-size: 15px; }
 .responsible-percent { text-align: right; color: var(--text); font: 500 11px "IBM Plex Mono", monospace; }
 
 .focus-list { display: grid; gap: 9px; }
-.focus-item { display: grid; grid-template-columns: 10px 1fr auto; align-items: start; gap: 11px; padding: 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-alt); }
+.focus-item { width: 100%; display: grid; grid-template-columns: 10px 1fr auto; align-items: start; gap: 11px; padding: 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-alt); color: var(--text); font: inherit; text-align: left; }
+.focus-item:hover, .focus-item:focus-visible { border-color: var(--brand); outline: 0; background: var(--surface); }
 .focus-marker { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--critical); box-shadow: 0 0 0 4px var(--critical-soft); }
 .focus-title { margin-bottom: 3px; color: var(--text); font-weight: 600; font-size: 12px; }
 .focus-meta { color: var(--muted); font: 10px "IBM Plex Mono", monospace; }

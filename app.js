@@ -42,10 +42,11 @@ const state = {
   extraRecords: [],
   authenticated: sessionStorage.getItem(AUTH_KEY) === "authenticated",
   loginError: "",
-  activeRole: "eor",
+  activeRole: "management",
   view: "dashboard",
   theme: localStorage.getItem(THEME_KEY) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   selectedId: null,
+  kpiFilter: "",
   filters: { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" },
   ai: { stage: "idle", fileName: "", suggestions: [], selected: [] },
 };
@@ -112,6 +113,18 @@ function findingRecord(id) {
 function openFinding(id) {
   if (!findingRecord(id)) return;
   state.selectedId = id;
+  render();
+}
+
+function emptyFilters() {
+  return { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
+}
+
+function openKpi(filter) {
+  state.view = "list";
+  state.selectedId = null;
+  state.filters = emptyFilters();
+  state.kpiFilter = filter;
   render();
 }
 
@@ -229,8 +242,9 @@ function renderHero() {
   `;
 }
 
-function renderKpi(label, value, foot) {
-  return `<article class="kpi-card"><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-foot">${escapeHtml(foot)}</div></article>`;
+function renderKpi(label, value, foot, filter) {
+  const interactive = filter ? ` kpi-card-action" data-action="open-kpi" data-kpi="${escapeHtml(filter)}" role="button" tabindex="0" aria-label="Ver detalle de ${escapeHtml(label)}"` : "";
+  return `<article class="kpi-card${interactive}><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-foot">${escapeHtml(foot)}</div></article>`;
 }
 
 function renderWallChart(records) {
@@ -296,7 +310,7 @@ function renderResponsible(records) {
 function renderFocus(records) {
   const focus = records.filter((record) => record.severidad === "Crítica" && record.status !== "Cerrado").sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5);
   if (!focus.length) return `<div class="empty-state"><div class="empty-icon">✓</div><div>No hay hallazgos críticos abiertos.</div><small>El foco gerencial está despejado.</small></div>`;
-  return `<div class="focus-list">${focus.map((record) => `<div class="focus-item"><i class="focus-marker"></i><div><div class="focus-title">${escapeHtml(record.nombre)}</div><div class="focus-meta">${escapeHtml(record.id)} · ${escapeHtml(record.muroLabel)} · ${record.progreso}% avance</div></div><div class="focus-date">${formatDate(record.fecha)}</div></div>`).join("")}</div>`;
+  return `<div class="focus-list">${focus.map((record) => `<button type="button" class="focus-item" data-action="open-finding" data-id="${escapeHtml(record.id)}" aria-label="Abrir ficha de ${escapeHtml(record.id)}"><i class="focus-marker"></i><div><div class="focus-title">${escapeHtml(record.nombre)}</div><div class="focus-meta">${escapeHtml(record.id)} · ${escapeHtml(record.muroLabel)} · ${record.progreso}% avance</div></div><div class="focus-date">${formatDate(record.fecha)}</div></button>`).join("")}</div>`;
 }
 
 function renderDashboard() {
@@ -306,10 +320,10 @@ function renderDashboard() {
   const average = records.length ? Math.round(records.reduce((sum, record) => sum + record.progreso, 0) / records.length) : 0;
   return `
     <section class="page-width kpi-grid">
-      ${renderKpi("Total de hallazgos", formatNumber(records.length), state.activeRole === "itrb" ? "Origen ITRB y DSR" : "Universo considerado")}
-      ${renderKpi("Abiertos / en proceso", formatNumber(open), records.length ? `${Math.round((open / records.length) * 100)}% del universo` : "Sin datos disponibles")}
-      ${renderKpi("Críticos sin cerrar", formatNumber(criticalOpen), criticalOpen ? "Requieren foco gerencial" : "Sin pendientes críticos")}
-      ${renderKpi("Avance promedio", `${average}%`, "Según progreso de gestión")}
+      ${renderKpi("Total de hallazgos", formatNumber(records.length), state.activeRole === "itrb" ? "Origen ITRB y DSR" : "Universo considerado", "total")}
+      ${renderKpi("Abiertos / en proceso", formatNumber(open), records.length ? `${Math.round((open / records.length) * 100)}% del universo` : "Sin datos disponibles", "open")}
+      ${renderKpi("Críticos sin cerrar", formatNumber(criticalOpen), criticalOpen ? "Requieren foco gerencial" : "Sin pendientes críticos", "critical")}
+      ${renderKpi("Avance promedio", `${average}%`, "Según progreso de gestión", "progress")}
     </section>
     <section class="page-width dashboard-grid">
       <article class="panel"><div class="panel-head"><div><div class="panel-title">Hallazgos por muro</div><div class="panel-note">Composición por severidad</div></div><span class="tag">${formatNumber(records.length)} registros</span></div>${renderWallChart(records)}</article>
@@ -325,6 +339,8 @@ function filteredRecords() {
   const { search, muro, origen, severidad, status, responsable, desde, hasta } = state.filters;
   const query = search.trim().toLocaleLowerCase("es");
   return state.records.filter((record) => {
+    if (state.kpiFilter === "open" && record.status === "Cerrado") return false;
+    if (state.kpiFilter === "critical" && (record.severidad !== "Crítica" || record.status === "Cerrado")) return false;
     if (query && ![record.id, record.nombre, record.descripcion, record.responsable].join(" ").toLocaleLowerCase("es").includes(query)) return false;
     if (muro && record.muro !== muro) return false;
     if (origen && record.origen !== origen) return false;
@@ -386,7 +402,8 @@ function renderFindingSheet() {
 
 function renderList() {
   const records = filteredRecords();
-  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">Filtra y haz clic en cualquier fila para abrir la ficha estructurada.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
+  const scope = { total: "Todos los hallazgos", open: "Abiertos y en proceso", critical: "Críticos sin cerrar", progress: "Universo para revisar avance" }[state.kpiFilter];
+  return `<section class="page-width"><article class="panel"><div class="panel-head"><div><div class="panel-title">Listado de hallazgos</div><div class="panel-note">${scope ? `${scope}. ` : ""}Filtra y haz clic en cualquier fila para abrir la ficha estructurada.</div></div><span class="tag">AND · filtros combinados</span></div>${renderFilters()}<div class="filter-actions"><div class="result-count">${formatNumber(records.length)} de ${formatNumber(state.records.length)} hallazgos</div><div class="button-row"><button class="button small" data-action="clear-filters">Limpiar</button><button class="button small primary" data-action="export-csv">Exportar CSV</button></div></div>${renderTable(records)}</article></section>`;
 }
 
 function renderNewForm() {
@@ -554,6 +571,10 @@ function handleClick(event) {
     render();
     return;
   }
+  if (action === "open-kpi") {
+    openKpi(event.target.closest("[data-kpi]")?.dataset.kpi || "total");
+    return;
+  }
   if (action === "toggle-theme") {
     state.theme = state.theme === "dark" ? "light" : "dark";
     localStorage.setItem(THEME_KEY, state.theme);
@@ -561,7 +582,8 @@ function handleClick(event) {
     return;
   }
   if (action === "clear-filters") {
-    state.filters = { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
+    state.filters = emptyFilters();
+    state.kpiFilter = "";
     render();
     return;
   }
@@ -622,7 +644,8 @@ function handleClick(event) {
     }));
     addRecords(imported);
     state.ai = { stage: "idle", fileName: "", suggestions: [], selected: [] };
-    state.filters = { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
+    state.filters = emptyFilters();
+    state.kpiFilter = "";
     state.view = "list";
     render();
     toast(`${imported.length} hallazgo${imported.length === 1 ? "" : "s"} importado${imported.length === 1 ? "" : "s"} al listado.`);
@@ -644,6 +667,12 @@ function handleKeydown(event) {
   if (findingRow && ["Enter", " "].includes(event.key)) {
     event.preventDefault();
     openFinding(findingRow.dataset.openFinding);
+    return;
+  }
+  const kpi = event.target.closest?.('[data-action="open-kpi"]');
+  if (kpi && ["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    openKpi(kpi.dataset.kpi || "total");
   }
 }
 
@@ -713,7 +742,8 @@ function handleSubmit(event) {
   const id = suggestedId(data.origen, data.muro, year);
   const record = { id, ...data, muroLabel: WALLS.find(([code]) => code === data.muro)?.[1] || "General", status: statusFromProgress(data.progreso) };
   addRecords([record]);
-  state.filters = { search: "", muro: "", origen: "", severidad: "", status: "", responsable: "", desde: "", hasta: "" };
+  state.filters = emptyFilters();
+  state.kpiFilter = "";
   state.view = "list";
   render();
   toast(`Hallazgo ${id} guardado correctamente.`);
