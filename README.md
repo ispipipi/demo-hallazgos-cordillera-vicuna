@@ -8,11 +8,18 @@ Demo comercial estática para mostrar captura, seguimiento y reportería de hall
 - Listado con filtros combinables, detalle expandible y exportación CSV UTF-8 BOM con separador `;`.
 - Captura manual con ID sugerido, estado derivado del progreso y persistencia local.
 - Detección con IA simulada: no procesa el archivo cargado y muestra siempre el aviso de demostración.
-- Selector de rol, modo oscuro y responsive desde 400 px.
+- Selector de rol, acceso de demostración, modo oscuro y responsive desde 400 px.
 
 ## Stack
 
-HTML, CSS y JavaScript vanilla. No requiere Firebase, autenticación, backend ni dependencias de npm. El dataset se carga desde `data/hallazgos.json`.
+HTML, CSS y JavaScript vanilla. No requiere Firebase, backend ni dependencias de npm. El dataset se carga desde `data/hallazgos.json`.
+
+## Acceso de demostración
+
+- Correo: `admin@vicuna.cl`
+- Contraseña: `1234`
+
+El acceso es un control de demostración del lado del cliente, con sesión limitada a la pestaña del navegador. Las credenciales quedan visibles en el código publicado; no usar este mecanismo para proteger información real.
 
 ## Ejecutar localmente
 

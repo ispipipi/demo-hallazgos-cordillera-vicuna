@@ -1,5 +1,8 @@
 const STORAGE_KEY = "hallazgos-cordillera-extra-v1";
 const THEME_KEY = "hallazgos-cordillera-theme-v1";
+const AUTH_KEY = "hallazgos-cordillera-auth-v1";
+const AUTH_EMAIL = "admin@vicuna.cl";
+const AUTH_PASSWORD = "1234";
 
 const ROLE_META = {
   eor: {
@@ -37,6 +40,8 @@ const SEVERITY_CLASS = { Crítica: "critical", Alta: "high", Media: "medium", Ba
 const state = {
   records: [],
   extraRecords: [],
+  authenticated: sessionStorage.getItem(AUTH_KEY) === "authenticated",
+  loginError: "",
   activeRole: "eor",
   view: "dashboard",
   theme: localStorage.getItem(THEME_KEY) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
@@ -199,6 +204,7 @@ function renderHeader() {
           <div class="role-switcher" aria-label="Selector de rol">
             ${Object.entries(ROLE_META).map(([key, role]) => `<button class="${state.activeRole === key ? "active" : ""}" data-role="${key}">${role.short}</button>`).join("")}
           </div>
+          <button class="button small session-button" data-action="logout">Cerrar sesión</button>
           <button class="icon-button" data-action="toggle-theme" aria-label="Cambiar modo de color">${state.theme === "dark" ? "☼" : "☾"}</button>
         </div>
       </div>
@@ -421,11 +427,48 @@ function renderAiResults() {
 }
 
 function renderFooter() {
-  return `<footer class="page-width footer">Demo comercial para Nava · Los datos y los flujos de IA son demostrativos. La selección de rol no constituye autenticación real.</footer>`;
+  return `<footer class="page-width footer">Demo comercial para Nava · Los datos y los flujos de IA son demostrativos. La autenticación es ilustrativa y no reemplaza un control de acceso productivo.</footer>`;
+}
+
+function renderLogin() {
+  return `
+    <main class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="login-brand">
+          <div class="brand-mark" aria-hidden="true">N·V</div>
+          <div>
+            <div class="brand-kicker">NAVA · DEMO COMERCIAL</div>
+            <div class="brand-name">Hallazgos Cordillera</div>
+          </div>
+        </div>
+        <div class="eyebrow">Acceso privado · demo Nava</div>
+        <h1 id="login-title">Ingresa a la plataforma</h1>
+        <p class="login-subtitle">Revisa el estado, criticidad y trazabilidad de los hallazgos del tranque Cordillera.</p>
+        <form id="login-form" novalidate>
+          <div class="field">
+            <label class="required" for="login-email">Correo</label>
+            <input id="login-email" name="email" type="email" autocomplete="username" placeholder="admin@vicuna.cl" required />
+          </div>
+          <div class="field">
+            <label class="required" for="login-password">Contraseña</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+          </div>
+          ${state.loginError ? `<p class="login-error" role="alert">${escapeHtml(state.loginError)}</p>` : ""}
+          <button class="button primary login-submit" type="submit">Ingresar</button>
+        </form>
+        <p class="login-note">Acceso de demostración. No usar esta credencial para datos reales.</p>
+      </section>
+    </main>
+  `;
 }
 
 function render() {
   applyTheme();
+  if (!state.authenticated) {
+    document.body.classList.remove("modal-open");
+    $("#app").innerHTML = renderLogin();
+    return;
+  }
   document.body.classList.toggle("modal-open", Boolean(state.selectedId));
   const view = state.view === "dashboard" ? renderDashboard() : state.view === "list" ? renderList() : state.view === "new" ? renderNewForm() : renderAi();
   $("#app").innerHTML = `${renderHeader()}<main class="main">${renderHero()}${view}</main>${renderFooter()}${renderFindingSheet()}`;
@@ -503,6 +546,14 @@ function handleClick(event) {
     return;
   }
   const action = event.target.closest("[data-action]")?.dataset.action;
+  if (action === "logout") {
+    sessionStorage.removeItem(AUTH_KEY);
+    state.authenticated = false;
+    state.loginError = "";
+    state.selectedId = null;
+    render();
+    return;
+  }
   if (action === "toggle-theme") {
     state.theme = state.theme === "dark" ? "light" : "dark";
     localStorage.setItem(THEME_KEY, state.theme);
@@ -633,6 +684,24 @@ function handleChange(event) {
 }
 
 function handleSubmit(event) {
+  if (event.target.id === "login-form") {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    const email = String(data.get("email") || "").trim().toLowerCase();
+    const password = String(data.get("password") || "");
+    if (email !== AUTH_EMAIL || password !== AUTH_PASSWORD) {
+      state.loginError = "Correo o contraseña incorrectos.";
+      render();
+      $("#login-email")?.focus();
+      return;
+    }
+    sessionStorage.setItem(AUTH_KEY, "authenticated");
+    state.authenticated = true;
+    state.loginError = "";
+    render();
+    toast("Sesión iniciada correctamente.");
+    return;
+  }
   if (event.target.id !== "new-finding-form") return;
   event.preventDefault();
   const data = readFormData(event.target);
