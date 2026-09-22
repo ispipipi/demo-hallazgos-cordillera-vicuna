@@ -128,6 +128,25 @@ function openKpi(filter) {
   render();
 }
 
+function openScope(scope) {
+  state.view = "list";
+  state.selectedId = null;
+  state.kpiFilter = "";
+  state.filters = { ...emptyFilters(), ...scope };
+  render();
+}
+
+function openScopeFromElement(element) {
+  openScope({
+    muro: element.dataset.muro || "",
+    severidad: element.dataset.severity || "",
+    status: element.dataset.status || "",
+    responsable: element.dataset.responsible || "",
+    desde: element.dataset.from || "",
+    hasta: element.dataset.to || "",
+  });
+}
+
 function badge(value, className) {
   return `<span class="badge ${className}">${escapeHtml(value)}</span>`;
 }
@@ -254,14 +273,14 @@ function renderWallChart(records) {
   });
 
   return `<div class="bar-chart">${counts.map((item) => `
-    <div class="bar-row">
+    <button type="button" class="bar-row" data-action="open-scope" data-muro="${escapeHtml(item.code)}" aria-label="Ver hallazgos de ${escapeHtml(item.label)}">
       <div class="bar-label">${escapeHtml(item.label)}</div>
       <div class="bar-track" title="${item.total} hallazgos">
         ${SEVERITIES.map((severity) => `<span class="bar-segment ${SEVERITY_CLASS[severity]}" style="width:${item.total ? (item.values[severity] / item.total) * 100 : 0}%" title="${severity}: ${item.values[severity]}"></span>`).join("")}
       </div>
       <div class="bar-total">${item.total}</div>
-    </div>`).join("")}</div>
-    <div class="legend">${SEVERITIES.map((severity) => `<span class="legend-item"><i class="legend-dot ${SEVERITY_CLASS[severity]}"></i>${severity}</span>`).join("")}</div>`;
+    </button>`).join("")}</div>
+    <div class="legend">${SEVERITIES.map((severity) => `<button type="button" class="legend-item legend-item-action" data-action="open-scope" data-severity="${escapeHtml(severity)}" aria-label="Ver hallazgos de severidad ${escapeHtml(severity)}"><i class="legend-dot ${SEVERITY_CLASS[severity]}"></i>${severity}</button>`).join("")}</div>`;
 }
 
 function renderDonut(records) {
@@ -274,7 +293,7 @@ function renderDonut(records) {
     return `var(--${SEVERITY_CLASS[severity]}) ${start}% ${cursor}%`;
   }).join(", ");
 
-  return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${total ? stops : "var(--surface-soft)"})"><div class="donut-center"><span class="donut-total">${formatNumber(total)}</span><span class="donut-caption">hallazgos</span></div></div><div class="donut-legend">${SEVERITIES.map((severity) => `<div class="legend-item"><span><i class="legend-dot ${SEVERITY_CLASS[severity]}"></i> ${severity}</span><span class="legend-value">${values[severity]} · ${total ? Math.round((values[severity] / total) * 100) : 0}%</span></div>`).join("")}</div></div>`;
+  return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${total ? stops : "var(--surface-soft)"})"><div class="donut-center"><span class="donut-total">${formatNumber(total)}</span><span class="donut-caption">hallazgos</span></div></div><div class="donut-legend">${SEVERITIES.map((severity) => `<button type="button" class="legend-item legend-item-action" data-action="open-scope" data-severity="${escapeHtml(severity)}" aria-label="Ver hallazgos de severidad ${escapeHtml(severity)}"><span><i class="legend-dot ${SEVERITY_CLASS[severity]}"></i> ${severity}</span><span class="legend-value">${values[severity]} · ${total ? Math.round((values[severity] / total) * 100) : 0}%</span></button>`).join("")}</div></div>`;
 }
 
 function renderTrend(records) {
@@ -289,11 +308,15 @@ function renderTrend(records) {
   const y = (value) => height - margin.bottom - (value / max) * (height - margin.top - margin.bottom);
   const path = (key) => monthData.map((item, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(item[key]).toFixed(1)}`).join(" ");
 
+  const monthBounds = (month) => {
+    const [year, monthNumber] = month.split("-").map(Number);
+    return { from: `${month}-01`, to: new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10) };
+  };
   return `<div class="trend-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Tendencia mensual de hallazgos registrados y cerrados">
     ${[0, .5, 1].map((ratio) => `<line class="chart-gridline" x1="${margin.left}" y1="${y(max * ratio)}" x2="${width - margin.right}" y2="${y(max * ratio)}" />`).join("")}
     <path class="chart-line-registered" d="${path("registered")}" />
     <path class="chart-line-closed" d="${path("closed")}" />
-    ${monthData.map((item, index) => `<circle class="chart-dot-registered" cx="${x(index)}" cy="${y(item.registered)}" r="3.5" /><circle class="chart-dot-closed" cx="${x(index)}" cy="${y(item.closed)}" r="3.5" /><text class="chart-label" x="${x(index)}" y="${height - 7}" text-anchor="middle">${escapeHtml(item.month.slice(2))}</text>`).join("")}
+    ${monthData.map((item, index) => { const bounds = monthBounds(item.month); return `<circle class="chart-dot-registered chart-action" cx="${x(index)}" cy="${y(item.registered)}" r="3.5" data-action="open-scope" data-from="${bounds.from}" data-to="${bounds.to}" role="button" tabindex="0" aria-label="Ver hallazgos registrados en ${escapeHtml(item.month)}" /><circle class="chart-dot-closed chart-action" cx="${x(index)}" cy="${y(item.closed)}" r="3.5" data-action="open-scope" data-from="${bounds.from}" data-to="${bounds.to}" data-status="Cerrado" role="button" tabindex="0" aria-label="Ver hallazgos cerrados en ${escapeHtml(item.month)}" /><text class="chart-label" x="${x(index)}" y="${height - 7}" text-anchor="middle">${escapeHtml(item.month.slice(2))}</text>`; }).join("")}
   </svg><div class="legend"><span class="legend-item"><i class="legend-dot" style="background:var(--brand)"></i>Registrados</span><span class="legend-item"><i class="legend-dot" style="background:var(--gold)"></i>Cerrados</span></div></div>`;
 }
 
@@ -304,7 +327,7 @@ function renderResponsible(records) {
     const percent = subset.length ? Math.round((subset.filter((record) => record.status === "Cerrado").length / subset.length) * 100) : 0;
     return { name, percent, count: subset.length };
   }).sort((a, b) => b.percent - a.percent);
-  return `<div class="responsible-list">${items.map((item) => `<div class="responsible-row"><div class="responsible-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div><div class="responsible-track"><div class="responsible-fill" style="width:${item.percent}%"></div></div><div class="responsible-percent">${item.percent}%</div></div>`).join("")}</div>`;
+  return `<div class="responsible-list">${items.map((item) => `<button type="button" class="responsible-row" data-action="open-scope" data-responsible="${escapeHtml(item.name)}" aria-label="Ver hallazgos de ${escapeHtml(item.name)}"><div class="responsible-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div><div class="responsible-track"><div class="responsible-fill" style="width:${item.percent}%"></div></div><div class="responsible-percent">${item.percent}%</div></button>`).join("")}</div>`;
 }
 
 function renderFocus(records) {
@@ -575,6 +598,10 @@ function handleClick(event) {
     openKpi(event.target.closest("[data-kpi]")?.dataset.kpi || "total");
     return;
   }
+  if (action === "open-scope") {
+    openScopeFromElement(event.target.closest('[data-action="open-scope"]'));
+    return;
+  }
   if (action === "toggle-theme") {
     state.theme = state.theme === "dark" ? "light" : "dark";
     localStorage.setItem(THEME_KEY, state.theme);
@@ -673,6 +700,12 @@ function handleKeydown(event) {
   if (kpi && ["Enter", " "].includes(event.key)) {
     event.preventDefault();
     openKpi(kpi.dataset.kpi || "total");
+    return;
+  }
+  const scope = event.target.closest?.('[data-action="open-scope"]');
+  if (scope && ["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    openScopeFromElement(scope);
   }
 }
 
