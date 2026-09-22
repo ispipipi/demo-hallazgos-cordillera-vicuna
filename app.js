@@ -8,11 +8,11 @@ const ROLE_META = {
     title: "Control operativo de hallazgos",
     subtitle: "Una vista consolidada para priorizar riesgos, responsables y planes de acción del tranque Cordillera.",
   },
-  trp: {
-    label: "Panel TRP-DSR",
-    short: "TRP / DSR",
+  itrb: {
+    label: "Panel ITRB-DSR",
+    short: "ITRB / DSR",
     title: "Revisión independiente de hallazgos",
-    subtitle: "Seguimiento enfocado en recomendaciones y observaciones levantadas por los paneles TRP y DSR.",
+    subtitle: "Seguimiento enfocado en recomendaciones y observaciones levantadas por los paneles ITRB y DSR.",
   },
   management: {
     label: "Gerencia cliente",
@@ -76,14 +76,14 @@ function statusClass(status) {
 }
 
 function findingCategory(record) {
-  if (record.origen === "TRP" || record.origen === "DSR") return "Gobernanza y revisión independiente";
+  if (record.origen === "ITRB" || record.origen === "DSR") return "Gobernanza y revisión independiente";
   if (/drenaje|filtr|agua|playa|talud|muro|instrument|piez|cota|eros/i.test(`${record.nombre} ${record.descripcion}`)) return "Control operacional e integridad";
   return "Gestión y control operacional";
 }
 
 function findingCriterion(record) {
   if (record.severidad === "Crítica") return "Gestión de riesgos · condición crítica";
-  if (record.origen === "TRP" || record.origen === "DSR") return "Recomendación / observación de revisión independiente";
+  if (record.origen === "ITRB" || record.origen === "DSR") return "Recomendación / observación de revisión independiente";
   return "Control operacional · seguimiento de condición";
 }
 
@@ -134,14 +134,26 @@ function applyTheme() {
 function loadExtraRecords() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(stored) ? stored : [];
+    return Array.isArray(stored) ? stored.map((record) => migrateLegacyRecord(record)) : [];
   } catch {
     return [];
   }
 }
 
+function migrateLegacyRecord(record) {
+  const replaceLegacyOrigin = (value) => typeof value === "string" ? value.replaceAll("TRP", "ITRB") : value;
+  return {
+    ...record,
+    id: replaceLegacyOrigin(record.id),
+    origen: record.origen === "TRP" ? "ITRB" : record.origen,
+    nombre: replaceLegacyOrigin(record.nombre),
+    descripcion: replaceLegacyOrigin(record.descripcion),
+    responsable: replaceLegacyOrigin(record.responsable),
+  };
+}
+
 function recordsForRole() {
-  return state.activeRole === "trp" ? state.records.filter((record) => ["TRP", "DSR"].includes(record.origen)) : state.records;
+  return state.activeRole === "itrb" ? state.records.filter((record) => ["ITRB", "DSR"].includes(record.origen)) : state.records;
 }
 
 function uniqueId(prefix, records = state.records) {
@@ -288,7 +300,7 @@ function renderDashboard() {
   const average = records.length ? Math.round(records.reduce((sum, record) => sum + record.progreso, 0) / records.length) : 0;
   return `
     <section class="page-width kpi-grid">
-      ${renderKpi("Total de hallazgos", formatNumber(records.length), state.activeRole === "trp" ? "Origen TRP y DSR" : "Universo considerado")}
+      ${renderKpi("Total de hallazgos", formatNumber(records.length), state.activeRole === "itrb" ? "Origen ITRB y DSR" : "Universo considerado")}
       ${renderKpi("Abiertos / en proceso", formatNumber(open), records.length ? `${Math.round((open / records.length) * 100)}% del universo` : "Sin datos disponibles")}
       ${renderKpi("Críticos sin cerrar", formatNumber(criticalOpen), criticalOpen ? "Requieren foco gerencial" : "Sin pendientes críticos")}
       ${renderKpi("Avance promedio", `${average}%`, "Según progreso de gestión")}
@@ -325,7 +337,7 @@ function renderFilters() {
   return `<div class="filters">
     <div class="field search-field"><label for="filter-search">Buscar</label><input id="filter-search" data-filter="search" value="${value("search")}" placeholder="ID, título, descripción o responsable" /></div>
     <div class="field"><label for="filter-wall">Muro</label><select id="filter-wall" data-filter="muro"><option value="">Todos</option>${WALLS.map(([code, label]) => `<option value="${code}" ${state.filters.muro === code ? "selected" : ""}>${label}</option>`).join("")}</select></div>
-    <div class="field"><label for="filter-origin">Origen</label><select id="filter-origin" data-filter="origen"><option value="">Todos</option>${["EoR", "TRP", "DSR"].map((item) => `<option ${state.filters.origen === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>
+    <div class="field"><label for="filter-origin">Origen</label><select id="filter-origin" data-filter="origen"><option value="">Todos</option>${["EoR", "ITRB", "DSR"].map((item) => `<option ${state.filters.origen === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>
     <div class="field"><label for="filter-severity">Severidad</label><select id="filter-severity" data-filter="severidad"><option value="">Todas</option>${SEVERITIES.map((item) => `<option ${state.filters.severidad === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>
     <div class="field"><label for="filter-status">Estado</label><select id="filter-status" data-filter="status"><option value="">Todos</option>${STATUS.map((item) => `<option ${state.filters.status === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>
     <div class="field"><label for="filter-responsible">Responsable</label><select id="filter-responsible" data-filter="responsable"><option value="">Todos</option>${responsibleOptions.map((item) => `<option ${state.filters.responsable === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select></div>
@@ -378,7 +390,7 @@ function renderNewForm() {
     <div class="field"><label>ID sugerido</label><input value="${escapeHtml(id)}" readonly aria-label="ID sugerido por el sistema" /></div>
     <div class="field"><label class="required" for="new-date">Fecha de detección</label><input id="new-date" name="fecha" type="date" value="${today}" required /></div>
     <div class="field"><label class="required" for="new-wall">Muro</label><select id="new-wall" name="muro" required>${WALLS.map(([code, label]) => `<option value="${code}" ${code === "MP" ? "selected" : ""}>${label}</option>`).join("")}</select></div>
-    <div class="field"><label class="required" for="new-origin">Origen</label><select id="new-origin" name="origen" required><option>EoR</option><option>TRP</option><option>DSR</option></select></div>
+    <div class="field"><label class="required" for="new-origin">Origen</label><select id="new-origin" name="origen" required><option>EoR</option><option>ITRB</option><option>DSR</option></select></div>
     <div class="field full"><label class="required" for="new-name">Nombre del hallazgo</label><input id="new-name" name="nombre" required placeholder="Ej. Filtración en talud aguas abajo" /></div>
     <div class="field full"><label class="required" for="new-description">Descripción</label><textarea id="new-description" name="descripcion" required placeholder="Describe la condición observada y su impacto."></textarea></div>
     <div class="field"><label class="required" for="new-severity">Severidad</label><select id="new-severity" name="severidad" required>${SEVERITIES.map((item) => `<option>${item}</option>`).join("")}</select></div>

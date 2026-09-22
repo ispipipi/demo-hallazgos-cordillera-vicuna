@@ -18,8 +18,8 @@ from pathlib import Path
 SOURCE = Path("/Users/julioespinoza/Downloads/Hallazgos Tranque Las Tórtolas.csv")
 TARGET = Path(__file__).resolve().parents[1] / "data" / "hallazgos.json"
 
-START_RE = re.compile(r"^(H-[A-Z]+-\d{4}-\d{3}|(?:TRP|DSR)\d{2}-(?:LT(?:/PC)?-\d{2}))(?=;)")
-YEAR_RE = re.compile(r"(?:H-[A-Z]+-(20\d{2})|(?:TRP|DSR)(\d{2}))")
+START_RE = re.compile(r"^(H-[A-Z]+-\d{4}-\d{3}|(?:TRP|ITRB|DSR)\d{2}-(?:LT(?:/PC)?-\d{2}))(?=;)")
+YEAR_RE = re.compile(r"(?:H-[A-Z]+-(20\d{2})|(?:TRP|ITRB|DSR)(\d{2}))")
 SEVERITIES = {"Low": "Baja", "Medium": "Media", "Significant": "Alta", "High": "Crítica"}
 BOOLEAN_VALUES = {"true", "false"}
 INVALID_IDS = {"TRP21-05", "TRP21-08"}
@@ -50,6 +50,7 @@ def clean_text(value: str) -> str:
     }
     for source, replacement in replacements.items():
         value = value.replace(source, replacement)
+    value = value.replace("TRP", "ITRB")
     return value
 
 
@@ -92,13 +93,15 @@ def wall_label(wall: str) -> str:
 
 
 def normalize_id(identifier: str) -> str:
-    return identifier.replace("/", "-")
+    return identifier.replace("/", "-").replace("TRP", "ITRB")
 
 
 def build_record(segment: list[str]) -> dict:
     first = segment[0].split(";")
     raw_id = first[0].strip()
     origin = (first[1] if len(first) > 1 else "EoR").strip() or "EoR"
+    if origin == "TRP":
+        origin = "ITRB"
     wall = (first[2] if len(first) > 2 else "General").strip() or "General"
     name = clean_text(first[3] if len(first) > 3 else "") or f"Hallazgo {raw_id}"
     progress = parse_progress(first)
@@ -128,13 +131,13 @@ def build_record(segment: list[str]) -> dict:
     status = "Abierto" if progress == 0 else "Cerrado" if progress == 100 else "En proceso"
     responsible = {
         "EoR": "Equipo Geotecnia",
-        "TRP": "Panel TRP",
+        "ITRB": "Panel ITRB",
         "DSR": "Panel DSR",
     }.get(origin, "Equipo Geotecnia")
 
     return {
         "id": normalize_id(raw_id),
-        "origen": origin if origin in {"EoR", "TRP", "DSR"} else "EoR",
+        "origen": origin if origin in {"EoR", "ITRB", "DSR"} else "EoR",
         "muro": wall if wall in {"MO", "MP", "ME", "MPL", "General"} else "General",
         "muroLabel": wall_label(wall),
         "nombre": name,
